@@ -1,0 +1,76 @@
+---------------------------------------
+- Preparação do ambiente              -
+- Apagar a tabela empr.         -
+- Criar e popular a tabela empr -
+---------------------------------------
+
+DROP TABLE empr PURGE;
+
+CREATE TABLE empr
+(cd_empregado NUMBER(5) PRIMARY KEY,
+ nm_empregado VARCHAR2(30),
+ vl_salario   NUMBER(9,2),
+ vl_comissao  NUMBER(9,2),
+ cd_depart    NUMBER(3));
+
+INSERT INTO empr VALUES (100, 'Pulquéria', 12728.47, NULL,10);
+INSERT INTO empr VALUES (110, 'Alarico', 890, 3000,20);
+INSERT INTO empr VALUES (130, 'Absolon', 1200, 7000,30);
+INSERT INTO empr VALUES (200, 'Kitty', 9870.22, NULL,20);
+
+COMMIT;
+
+SET SERVEROUTPUT ON
+
+CREATE OR REPLACE TRIGGER secure_emp
+BEFORE INSERT ON empr 
+  BEGIN
+   IF (TO_CHAR(SYSDATE,'DY') IN ('SAT','SUN')) OR
+      (TO_CHAR(SYSDATE,'HH24:MI') 										NOT BETWEEN '08:00' AND '18:00') THEN
+   RAISE_APPLICATION_ERROR(-20500, 'Inclusão na tabela empr fora do horário comercial.');
+   END IF;
+  END;
+/
+
+INSERT INTO empr (cd_empregado, nm_empregado, vl_salario, cd_depart)
+VALUES (300, 'Epaminondas', 4500, 60);
+
+INSERT OR UPDATE OR DELETE ON empr 
+  BEGIN
+    IF (TO_CHAR(SYSDATE,'DY') IN ('SAT','SUN')) OR
+       (TO_CHAR(SYSDATE,'HH24') 
+        NOT BETWEEN '08' AND '18') THEN
+      IF DELETING THEN 
+      RAISE_APPLICATION_ERROR(-20502, 'Só é possível apagar no horário comercial.');
+      ELSIF INSERTING THEN 
+      RAISE_APPLICATION_ERROR(-20500,'Só é possível incluir no horário comercial.');
+      ELSIF UPDATING('vl_salario') THEN
+        RAISE_APPLICATION_ERROR(-20503, 'Fora do horário.');
+      ELSE RAISE_APPLICATION_ERROR(-20504, 'Fechamos');
+      END IF;
+    END IF;
+  END;
+
+ create table Historico(
+  codigo    number(4,0),
+  nome      varchar2(30),
+  sal       number(9,2),
+  data      date);
+
+CREATE OR REPLACE TRIGGER trg_apagados
+BEFORE DELETE
+ON empr
+REFERENCING NEW AS NEW OLD AS OLD
+FOR EACH ROW
+BEGIN
+insert into historico values (:old.cd_empregado, :old.nm_empregado, :old.vl_salario, sysdate);
+END;
+/
+
+select * from historico;
+
+delete from empr where cd_empregado = 130;
+
+select * from historico;
+
+
